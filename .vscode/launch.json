@@ -1,0 +1,48 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'cdc'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=cdc",
+          "--package=cdc"
+        ],
+        "filter": {
+          "name": "cdc",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "-o",
+        "."
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'cdc'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=cdc",
+          "--package=cdc"
+        ],
+        "filter": {
+          "name": "cdc",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "-o",
+        "."
+      ],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
