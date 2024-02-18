@@ -4,7 +4,7 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'cdc'",
+      "name": "Debug 'cdc' pre directory",
       "cargo": {
         "args": [
           "build",

@@ -5,6 +5,7 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::process::exit;
 use std::{
     env,
     env::VarError,
@@ -168,14 +169,11 @@ impl Cli {
     }
 
     /// Prepares directories for... well, something important. (To be implemented)
-    fn prepare_directories(&self) {
-        /* TODO: To implement */
-        // Go inside the output directory from CliArgs struct,
-        // prepare an array of directories to store inside the zip file
-        // prepare an array of directories to avoid from the zip file
-        // merge the two arrays removing all directories to avoid from the store dirs array
-        // return the filtered array of directories
-        todo!("Prepare directories")
+    fn prepare_exclude_directories(&self) -> Vec<PathBuf> {
+        let exclude_dirs: Vec<&str> = self.arguments.excluded.split(",").collect();
+        let exclude_dirs_buf: Vec<PathBuf> = exclude_dirs.iter().map(|path| PathBuf::from(path)).collect();
+
+        return exclude_dirs_buf;
     }
 
     /// Predicts how big the zip file will be. (It's like fortune-telling for files)
@@ -197,12 +195,22 @@ impl Cli {
         todo!("Print the preview before continue the program")
     }
 
+    fn configure_output_name(&self) -> &Path {
+        // TODO: use datetime to format the filename (tmp_<datetime>.zip)
+        if self.arguments.filename_out == "" {
+            return Path::new("tmp.zip");
+        }
+        
+        return Path::new(&self.arguments.filename_out);
+    }
+
     /// Zip the target directory excluding the choosen ones
     fn zip_files(&self) -> Result<(), Error> {
         // TODO: Refactor this function
         // TODO: Set the zip file name using cli argument
-        let path = Path::new(&self.arguments.filename_out);
+        let path = self.configure_output_name();
         let file = File::create(&path)?;
+        let exclude_directories = self.prepare_exclude_directories();
 
         let mut stack: Vec<PathBuf> = vec![PathBuf::from(&self.arguments.target)];
         let mut zip = ZipWriter::new(file);
@@ -214,6 +222,8 @@ impl Cli {
                 .unwrap_or(&current_path);
 
             if current_path.is_dir() {
+                // FIXME : Debug this if exclude_directories (why it doesn't work)
+                if exclude_directories.contains(&current_path) { print!("Contains") };
                 for entry in fs::read_dir(&current_path)? {
                     let entry = entry?;
                     stack.push(entry.path());
@@ -267,22 +277,25 @@ impl Cli {
 
     /// Runs the tool and zips the files.
     fn run(&mut self) {
-        self.parse_relative_directory().unwrap();
-        print!("parsed: {:#?}", self);
+        self.parse_relative_directory()
+            .unwrap_or_else(|er| eprintln!("[EROR] {}", er));
+        println!("[INFO] parsed: {:#?}", self);
 
         match self.calculate_target_size() {
             Ok(size) => {
                 let (s, t) = self.as_human_read(size);
                 println!("{}{}", s as usize, t);
-                self.zip_files().unwrap();
+                self.zip_files()
+                    .unwrap_or_else(|er| eprintln!("[EROR] {}", er));
             }
-            Err(er) => eprintln!("{}", er),
+            Err(er) => eprintln!("[EROR] {}", er),
         }
     }
 }
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
+
     if args.is_empty() {
         println!("Please provide a valid argument! See -h to help");
         process::exit(1);
@@ -312,6 +325,7 @@ fn main() {
         }
     }
 
+    println!("{cli_config:?}");
     let mut cli = Cli::new(cli_config);
     cli.run();
 }
