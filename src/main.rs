@@ -2,10 +2,9 @@
 //! License: MIT
 //!
 //! Release date:
-use std::fs::File;
+use std::fs::{DirEntry, File};
 use std::io::{Read, Write};
 use std::path::Path;
-use std::process::exit;
 use std::{
     env,
     env::VarError,
@@ -200,8 +199,15 @@ impl Cli {
         if self.arguments.filename_out == "" {
             return Path::new("tmp.zip");
         }
-        
+
         return Path::new(&self.arguments.filename_out);
+    }
+
+    fn is_excluded_path(&self, path: &DirEntry) -> bool {
+        // FIXME: parse the excluded path names correctly
+        let exclude_paths: Vec<PathBuf> = self.prepare_exclude_directories();
+
+        return exclude_paths.contains(&path.path());
     }
 
     /// Zip the target directory excluding the choosen ones
@@ -209,8 +215,7 @@ impl Cli {
         // TODO: Refactor this function
         // TODO: Set the zip file name using cli argument
         let path = self.configure_output_name();
-        let file = File::create(&path)?;
-        let exclude_directories = self.prepare_exclude_directories();
+        let file = File::create(path)?;
 
         let mut stack: Vec<PathBuf> = vec![PathBuf::from(&self.arguments.target)];
         let mut zip = ZipWriter::new(file);
@@ -222,21 +227,25 @@ impl Cli {
                 .unwrap_or(&current_path);
 
             if current_path.is_dir() {
-                // FIXME : Debug this if exclude_directories (why it doesn't work)
-                if exclude_directories.contains(&current_path) { print!("Contains") };
                 for entry in fs::read_dir(&current_path)? {
                     let entry = entry?;
-                    stack.push(entry.path());
+                    // if entry is not an excluded
+                    if !self.is_excluded_path(&entry) {
+                        stack.push(entry.path());
+                    }
+                    continue;
                 }
                 if relative_path != Path::new("") {
                     let mut dir_path = relative_path.to_str().unwrap().to_owned();
                     dir_path.push('/'); // add a '/' to the end of the path
+
                     zip.add_directory(&dir_path, FileOptions::default())?;
                     println!("Directory {} added to zip file!", dir_path);
                 }
             } else {
                 zip.start_file(relative_path.to_str().unwrap(), FileOptions::default())?;
                 let mut f = File::open(&current_path)?;
+
                 let mut buffer = Vec::new();
                 f.read_to_end(&mut buffer)?;
                 zip.write_all(&buffer)?;
