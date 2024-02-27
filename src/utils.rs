@@ -24,13 +24,13 @@ pub fn print_helper(support_message: Option<String>) {
     };
     print!("{}", message);
     let help = r#"Usage:  cdc [OPTIONS] COMMAND
-
 Your best Code directory cleaner
 
 Options:
-  -o          Set the output
+  -t          Set the target directory
+  -O          Set the output filename
   -e          Exlude directories
-  -R          Set the target directory
+  -h          Print the helps
     "#;
     println!("{}", help);
 }

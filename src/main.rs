@@ -2,9 +2,11 @@
 //! License: MIT
 //!
 //! Release date:
+use constants::*;
 use std::fs::{DirEntry, File};
 use std::io::{Read, Write};
 use std::path::Path;
+use std::process::exit;
 use std::{
     env,
     env::VarError,
@@ -19,11 +21,8 @@ use std::{
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
+mod constants;
 mod utils;
-
-static KB_DEF: &str = "Kb";
-static MB_DEF: &str = "Mb";
-static GB_DEF: &str = "Gb";
 
 /// Represents command-line options.
 #[derive(Debug)]
@@ -170,7 +169,10 @@ impl Cli {
     /// Prepares directories for... well, something important. (To be implemented)
     fn prepare_exclude_directories(&self) -> Vec<PathBuf> {
         let exclude_dirs: Vec<&str> = self.arguments.excluded.split(",").collect();
-        let exclude_dirs_buf: Vec<PathBuf> = exclude_dirs.iter().map(|path| PathBuf::from(path)).collect();
+        let exclude_dirs_buf: Vec<PathBuf> = exclude_dirs
+            .iter()
+            .map(|path| PathBuf::from(path.trim()))
+            .collect();
 
         return exclude_dirs_buf;
     }
@@ -204,10 +206,47 @@ impl Cli {
     }
 
     fn is_excluded_path(&self, path: &DirEntry) -> bool {
-        // FIXME: parse the excluded path names correctly
+        // TODO: put this `exclude_paths` outside of this scope
+        // optimize the performance
+
         let exclude_paths: Vec<PathBuf> = self.prepare_exclude_directories();
 
-        return exclude_paths.contains(&path.path());
+        // Check if the current path starts with any of the excluded paths
+        for excluded_path in exclude_paths {
+            // FIXME: THE BUG IS HERE!!!
+            // the bug is on string formatting, the path check should be done with this structure
+            // if "./path" is "./path" => The second one should be formatted correctly when passed as cli argument
+            let _str_path = match excluded_path.to_str() {
+                Some(path) => {
+                    if path.contains(".") || path.contains("/") {
+                        eprintln!(
+                            "[EROR] Please provide a valid directories to exclude! ex: 'target, node_modules'"
+                        );
+                        exit(EXIT_ERROR)
+                    }
+
+                    let formatted_path = format!("./{}", &path); // FIXME: use &str instead of a String (stack memory instead of the heap)
+                    formatted_path
+                }
+                None => {
+                    eprintln!(
+                        "[EROR] Please provide a valid directories to exclude! ex: 'target, node_modules'"
+                    );
+                    exit(EXIT_ERROR)
+                }
+            };
+
+            println!(
+                "path to exclude: {:?}, new path: {:?}",
+                excluded_path.as_path(),
+                path.path()
+            );
+
+            if path.path().starts_with(_str_path) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Zip the target directory excluding the choosen ones
@@ -229,8 +268,12 @@ impl Cli {
             if current_path.is_dir() {
                 for entry in fs::read_dir(&current_path)? {
                     let entry = entry?;
+
                     // if entry is not an excluded
-                    if !self.is_excluded_path(&entry) {
+                    // FIXME: This doesn't work, needs to fix (maybe with glob?)
+                    println!("{:?}, {:?}", current_path, entry);
+                    let is_not_excluded = !self.is_excluded_path(&entry);
+                    if is_not_excluded {
                         stack.push(entry.path());
                     }
                     continue;
